@@ -1,1 +1,0 @@
-stack exec ghc -- Main -o missionaries-and-cannibals
