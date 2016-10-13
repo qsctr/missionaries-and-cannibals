@@ -6,13 +6,13 @@ import Data.List
 import Data.Function
 import System.Console.ANSI
 import System.IO
-import Text.Read
+import Text.Read (readMaybe)
 
 data Boat = L | R deriving (Eq, Show, Read)
+type BoatSize = Int
 type Config = (Int, Int)
 type State = (Config, Config, Boat)
 type StateWithSteps = (State, (Config, IO ()))
-type BoatSize = Int
 
 main :: IO ()
 main = do
@@ -75,64 +75,68 @@ main = do
                                 addSteps state@((ml', cl'), (mr', cr'), _) =
                                   (,) state $ (,) (mb, cb) $ do
                                     prevSteps
-                                    colorM
-                                    printM ml
-                                    colorC
-                                    printC cl
-                                    colorR
-                                    putRep (if bl then 0 else 10) '.'
-                                    putChar '['
-                                    putRep boatSize '_'
-                                    putChar ']'
-                                    putRep (if br then 0 else 10) '.'
-                                    colorM
-                                    printM mr
-                                    colorC
-                                    printC cr
-                                    hFlush stdout
-                                    threadDelay 500000 -- microseconds
-                                    resetLine
+                                    printM' ml
+                                    printC' cl
+                                    printRiver (if bl then 0 else 10)
+                                    printEmptyBoat
+                                    printRiver (if br then 0 else 10)
+                                    printM' mr
+                                    printC' cr
+                                    waitAndReset 500000
                                     forM_ (if bl then [0..10] else [10,9..0]) $ \i -> do
-                                      colorM
-                                      printM (if bl then ml' else ml)
-                                      colorC
-                                      printC (if bl then cl' else cl)
-                                      colorR
-                                      putRep i '.'
-                                      putChar '['
-                                      colorM
-                                      putRep mb '@'
-                                      colorC
-                                      putRep cb '#'
-                                      colorR
-                                      putRep (boatSize - mb - cb) '_'
-                                      putChar ']'
-                                      putRep (10 - i) '.'
-                                      colorM
-                                      printM (if br then mr' else mr)
-                                      colorC
-                                      printC (if br then cr' else cr)
-                                      hFlush stdout
-                                      threadDelay 150000
-                                      resetLine
-                                    colorM
-                                    printM ml'
-                                    colorC
-                                    printC cl'
-                                    colorR
-                                    putRep (if bl then 10 else 0) '.'
-                                    putChar '['
-                                    putRep boatSize '_'
-                                    putChar ']'
-                                    putRep (if br then 10 else 0) '.'
-                                    colorM
-                                    printM mr'
-                                    colorC
-                                    printC cr'
+                                      printM' (if bl then ml' else ml)
+                                      printC' (if bl then cl' else cl)
+                                      printRiver i
+                                      printBoatL
+                                      printM mb
+                                      printC cb
+                                      printBoat (boatSize - mb - cb)
+                                      printBoatR
+                                      printRiver (10 - i)
+                                      printM' (if br then mr' else mr)
+                                      printC' (if br then cr' else cr)
+                                      waitAndReset 150000
+                                    printM' ml'
+                                    printC' cl'
+                                    printRiver (if bl then 10 else 0)
+                                    printEmptyBoat
+                                    printRiver (if br then 10 else 0)
+                                    printM' mr'
+                                    printC' cr'
                                     putStrLn ""
-              resetLine = clearLine >> setCursorColumn 0
-              printM m = putRep m '@' >> putRep (totalM - m) ' '
-              printC c = putRep c '#' >> putRep (totalC - c) ' '
+              waitAndReset n = do
+                hFlush stdout
+                threadDelay n
+                clearLine
+                setCursorColumn 0
+              printM m = do
+                colorM
+                putRep m '@'
+              printM' m = do
+                printM m
+                putRep (totalM - m) ' '
+              printC c = do
+                colorC
+                putRep c '#'
+              printC' c = do
+                printC c
+                putRep (totalC - c) ' '
+              printBoatL = do
+                colorR
+                putChar '['
+              printBoatR = do
+                colorR
+                putChar ']'
+              printBoat b = do
+                colorR
+                putRep b '_'
+              printEmptyBoat = do
+                printBoatL
+                printBoat boatSize
+                printBoatR
+              printRiver r = do
+                colorR
+                putRep r '.'
               putRep n c = putStr $ replicate n c
       colorM = setSGR [SetColor Foreground Vivid Blue]
       colorC = setSGR [SetColor Foreground Vivid Red]
