@@ -12,7 +12,7 @@ data Boat = L | R deriving (Eq, Show, Read)
 type BoatSize = Int
 type Config = (Int, Int)
 type State = (Config, Config, Boat)
-type StateWithSteps = (State, (Config, IO ()))
+type StateWithSteps = (State, (Config, [IO ()]))
 
 main :: IO ()
 main = do
@@ -47,8 +47,9 @@ main = do
     else return ((ml, cl), (mr, cr))
   boatSize <- ask "boat size" 2
   limit <- ask "iteration limit" $ 1 / 0
+  animation <- ask "animation on (True or False)" True
   putStrLn "Searching..."
-  let search :: [StateWithSteps] -> Double {- 1 / 0 :: Double -} -> Maybe (IO ())
+  let search :: [StateWithSteps] -> Double {- 1 / 0 :: Double -} -> Maybe ([IO ()])
       search paths iter
         | iter > limit = Nothing
         | Just (_, (_, steps)) <- find isGoal paths = Just steps
@@ -73,50 +74,62 @@ main = do
                           where bl = boat == L
                                 br = boat == R
                                 addSteps state@((ml', cl'), (mr', cr'), _) =
-                                  (,) state $ (,) (mb, cb) $ do
-                                    prevSteps
-                                    printM' ml
-                                    printC' cl
-                                    printRiver (if bl then 0 else 10)
-                                    printEmptyBoat
-                                    printRiver (if br then 0 else 10)
-                                    printM' mr
-                                    printC' cr
-                                    waitAndReset 500000
-                                    forM_ (if bl then [0..10] else [10,9..0]) $ \i -> do
-                                      printM' (if bl then ml' else ml)
-                                      printC' (if bl then cl' else cl)
-                                      printRiver i
-                                      printBoatL
-                                      printM mb
-                                      printC cb
-                                      printBoat (boatSize - mb - cb)
-                                      printBoatR
-                                      printRiver (10 - i)
-                                      printM' (if br then mr' else mr)
-                                      printC' (if br then cr' else cr)
-                                      waitAndReset 150000
-                                    printM' ml'
-                                    printC' cl'
-                                    printRiver (if bl then 10 else 0)
-                                    printEmptyBoat
-                                    printRiver (if br then 10 else 0)
-                                    printM' mr'
-                                    printC' cr'
-                                    putStrLn ""
+                                  (,) state $ (,) (mb, cb) $ (: prevSteps) $ if not animation
+                                    then do
+                                      setColor Cyan
+                                      putStrLn $ "Move " ++ show mb ++ " missionar"
+                                        ++ (if mb == 1 then "y" else "ies")
+                                        ++ " and " ++ show cb ++ " cannibal"
+                                        ++ (if cb == 1 then "" else "s") ++ " to the "
+                                        ++ (if boat == L then "right" else "left")
+                                      colorR
+                                      putStrLn $ "New state is: M:"
+                                        ++ show ml' ++ " C:" ++ show cl'
+                                        ++ (if bl then " ......boat " else " boat...... ")
+                                        ++ "M:" ++ show mr' ++ " C:" ++ show cr'
+                                    else do
+                                      printM' ml
+                                      printC' cl
+                                      printRiver (if bl then 0 else 10)
+                                      printEmptyBoat
+                                      printRiver (if br then 0 else 10)
+                                      printM' mr
+                                      printC' cr
+                                      waitAndReset 500000
+                                      forM_ (if bl then [0..10] else [10,9..0]) $ \i -> do
+                                        printM' (if bl then ml' else ml)
+                                        printC' (if bl then cl' else cl)
+                                        printRiver i
+                                        printBoatL
+                                        printM mb
+                                        printC cb
+                                        printBoat (boatSize - mb - cb)
+                                        printBoatR
+                                        printRiver (10 - i)
+                                        printM' (if br then mr' else mr)
+                                        printC' (if br then cr' else cr)
+                                        waitAndReset 150000
+                                      printM' ml'
+                                      printC' cl'
+                                      printRiver (if bl then 10 else 0)
+                                      printEmptyBoat
+                                      printRiver (if br then 10 else 0)
+                                      printM' mr'
+                                      printC' cr'
+                                      putStrLn ""
               waitAndReset n = do
                 hFlush stdout
                 threadDelay n
                 clearLine
                 setCursorColumn 0
               printM m = do
-                colorM
+                setColor Blue
                 putRep m '@'
               printM' m = do
                 printM m
                 putRep (totalM - m) ' '
               printC c = do
-                colorC
+                setColor Red
                 putRep c '#'
               printC' c = do
                 printC c
@@ -138,17 +151,19 @@ main = do
                 colorR
                 putRep r '.'
               putRep n c = putStr $ replicate n c
-      colorM = setSGR [SetColor Foreground Vivid Blue]
-      colorC = setSGR [SetColor Foreground Vivid Red]
+      setColor c = setSGR [SetColor Foreground Vivid c]
       colorR = setSGR [Reset]
-  case search [(start, ((0, 0), return ()))] 1 of
+  case search [(start, ((0, 0), []))] 1 of
     Nothing -> putStrLn "No solution found within the iteration limit"
     Just steps -> do
-      putStrLn "Solution found"
-      colorM
-      putStrLn "@ = missionary"
-      colorC
-      putStrLn "# = cannibal"
-      steps
+      putStrLn $ "Solution found, " ++ show (length steps) ++ " steps"
+      if animation then do
+        setColor Blue
+        putStrLn "@ = missionary"
+        setColor Red
+        putStrLn "# = cannibal"
+      else return ()
+      sequence_ $ reverse steps
       colorR
+      putStrLn $ show (length steps) ++ " steps"
       exit
